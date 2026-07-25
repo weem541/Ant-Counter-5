@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ant Care Manager & AI Counter</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 min-h-screen p-3 font-sans text-slate-800 flex justify-center items-start">
+
+  <div class="w-full max-w-md bg-white rounded-3xl p-4 shadow-xl border border-slate-200 flex flex-col gap-4">
+    
+    <!-- Top Nav Header -->
+    <div class="flex justify-between items-center border-b pb-2 text-slate-700">
+      <div class="flex items-center gap-2 font-bold text-lg">
+        <span>🐜</span>
+        <span>Ant Care Manager</span>
+      </div>
+      <span class="text-xs bg-blue-100 text-blue-700 font-semibold px-2.5 py-1 rounded-full">v1.0 Hybrid</span>
+    </div>
+
+    <!-- 1. ส่วนเลือก/สร้างรัง (Nest Selector) -->
+    <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 flex flex-col gap-2">
+      <label class="text-xs font-bold text-slate-600 flex justify-between items-center">
+        <span>📍 เลือกรัง/หลอดทดลอง:</span>
+        <button onclick="createNewNest()" class="text-blue-600 hover:underline text-[11px]">+ สร้างรังใหม่</button>
+      </label>
+      <select id="nest-select" onchange="loadNestData()" class="w-full p-2 text-sm bg-white border border-slate-300 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <!-- จะถูกเติมด้วย JavaScript -->
+      </select>
+    </div>
+
+    <!-- 2. ส่วนแสดงกล้อง สแกน AI -->
+    <div id="webcam-container" class="w-full h-64 bg-slate-900 rounded-2xl overflow-hidden flex flex-col items-center justify-center relative border border-slate-200 shadow-inner">
+      
+      <!-- Live Badge -->
+      <div class="absolute top-3 left-3 bg-black/40 backdrop-blur-md text-white text-[10px] px-2.5 py-0.5 rounded-full z-20 font-semibold flex items-center gap-1">
+        <span class="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span> CAMERA ACTIVE
+      </div>
+
+      <video id="webcam" class="w-full h-full object-cover hidden z-10" autoplay playsinline muted></video>
+      <canvas id="capture-canvas" class="hidden"></canvas>
+
+      <!-- Start Button -->
+      <button id="start-btn" onclick="startCamera()" class="z-30 bg-white hover:bg-slate-50 text-slate-800 font-bold py-3 px-6 rounded-2xl shadow-lg transition transform active:scale-95 flex flex-col items-center gap-1">
+        <span class="text-3xl">📷</span>
+        <span class="text-xs">เปิดกล้องสแกนประมวลผล</span>
+      </button>
+
+      <p id="loading-text" class="text-slate-400 text-xs hidden z-30">กำลังเชื่อมต่อกล้อง...</p>
+    </div>
+
+    <!-- Status Text -->
+    <p id="status-text" class="text-center text-xs text-slate-500 font-medium">พร้อมสแกนข้อมูล</p>
+
+    <!-- 3. ส่วนแสดงผลการสแกน (Current Realtime AI Detection) -->
+    <div class="grid grid-cols-2 gap-2">
+      <div class="bg-blue-50/80 p-3 rounded-2xl border border-blue-100 text-center">
+        <p class="text-[11px] text-blue-600 font-bold mb-0.5">🥚 จำนวนไข่</p>
+        <p class="text-2xl font-black text-blue-800"><span id="egg-count">0</span> <span class="text-xs font-normal">ฟอง</span></p>
+      </div>
+      <div class="bg-orange-50/80 p-3 rounded-2xl border border-orange-100 text-center">
+        <p class="text-[11px] text-orange-600 font-bold mb-0.5">🐜 มดงาน</p>
+        <p class="text-2xl font-black text-orange-800"><span id="ant-count">0</span> <span class="text-xs font-normal">ตัว</span></p>
+      </div>
+      <div class="bg-emerald-50/80 p-3 rounded-2xl border border-emerald-100 text-center">
+        <p class="text-[11px] text-emerald-600 font-bold mb-0.5">👑 ราชินี (รอด)</p>
+        <p class="text-2xl font-black text-emerald-800"><span id="queen-alive-count">0</span> <span class="text-xs font-normal">ตัว</span></p>
+      </div>
+      <div class="bg-rose-50/80 p-3 rounded-2xl border border-rose-100 text-center">
+        <p class="text-[11px] text-rose-600 font-bold mb-0.5">💀 ราชินี (ตาย)</p>
+        <p class="text-2xl font-black text-rose-800"><span id="queen-dead-count">0</span> <span class="text-xs font-normal">ตัว</span></p>
+      </div>
+    </div>
+
+    <!-- ปุ่มบันทึกข้อมูลเข้าประวัติตามรัง -->
+    <button onclick="saveScanRecord()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-2xl shadow-md transition active:scale-95 flex justify-center items-center gap-2 text-sm">
+      <span>💾</span> บันทึกผลลงประวัติตามรังนี้
+    </button>
+
+    <!-- 4. ส่วนแสดงประวัติและคำนวณระยะเวลา (Growth Timeline & History) -->
+    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col gap-2">
+      <h3 class="text-xs font-bold text-slate-700 border-b pb-1 flex justify-between items-center">
+        <span>📊 สรุปประวัติการเจริญเติบโต</span>
+        <span id="days-badge" class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-semibold">ผ่านไป 0 วัน</span>
+      </h3>
+      
+      <div class="text-xs text-slate-600 space-y-1.5 mt-1">
+        <div class="flex justify-between">
+          <span>สแกนครั้งแรกเมื่อ:</span>
+          <span id="first-scan-date" class="font-semibold text-slate-800">-</span>
+        </div>
+        <div class="flex justify-between">
+          <span>สแกนล่าสุดเมื่อ:</span>
+          <span id="last-scan-date" class="font-semibold text-slate-800">-</span>
+        </div>
+        <div class="flex justify-between">
+          <span>สถานะราชินีล่าสุด:</span>
+          <span id="queen-status-text" class="font-bold text-slate-500">-</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // 🔑 ตั้งค่า Roboflow API
+    const API_KEY = "UBjBHDRdFFV8bd2XMIsW";
+    const MODEL_ID = "find-egg-ant-and-ant";
+    const VERSION = "1";
+    const INFER_URL = "https://detect.roboflow.com/" + MODEL_ID + "/" + VERSION + "?api_key=" + API_KEY;
+
+    const video = document.getElementById("webcam");
+    const canvas = document.getElementById("capture-canvas");
+    const ctx = canvas.getContext("2d");
+    let isProcessing = false;
+
+    // ระบบฐานข้อมูลในเครื่อง (LocalStorage)
+    let nests = JSON.parse(localStorage.getItem("ant_nests")) || {
+      "Nest_01": { firstDate: null, lastDate: null, egg: 0, ant: 0, qAlive: 0, qDead: 0 }
+    };
+    let currentNest = "Nest_01";
+
+    // เริ่มต้นระบบ
+    window.onload = () => {
+      renderNestOptions();
+      loadNestData();
+    };
+
+    function renderNestOptions() {
+      const select = document.getElementById("nest-select");
+      select.innerHTML = "";
+      Object.keys(nests).forEach(nestName => {
+        const option = document.createElement("option");
+        option.value = nestName;
+        option.innerText = nestName;
+        select.appendChild(option);
+      });
+      select.value = currentNest;
+    }
+
+    function createNewNest() {
+      const name = prompt("ตั้งชื่อรังใหม่ (เช่น รัง A, หลอดที่ 2):");
+      if (name && !nests[name]) {
+        nests[name] = { firstDate: null, lastDate: null, egg: 0, ant: 0, qAlive: 0, qDead: 0 };
+        currentNest = name;
+        saveToLocalStorage();
+        renderNestOptions();
+        loadNestData();
+      }
+    }
+
+    function loadNestData() {
+      currentNest = document.getElementById("nest-select").value;
+      const data = nests[currentNest];
+
+      document.getElementById("first-scan-date").innerText = data.firstDate || "ยังไม่มีข้อมูล";
+      document.getElementById("last-scan-date").innerText = data.lastDate || "ยังไม่มีข้อมูล";
+
+      // คำนวณส่วนต่างจำนวนวัน
+      if (data.firstDate) {
+        const start = new Date(data.firstDate);
+        const end = data.lastDate ? new Date(data.lastDate) : new Date();
+        const diffDays = Math.floor((end - start) / (1000 * 60 * 60 * 24));
+        document.getElementById("days-badge").innerText = `ผ่านไป ${diffDays} วัน`;
+      } else {
+        document.getElementById("days-badge").innerText = "ผ่านไป 0 วัน";
+      }
+
+      // แสดงสถานะราชินี
+      const qStatus = document.getElementById("queen-status-text");
+      if (data.qDead > 0) {
+        qStatus.innerText = "❌ ไม่รอด (พบราชินีตาย)";
+        qStatus.className = "font-bold text-rose-600";
+      } else if (data.qAlive > 0) {
+        qStatus.innerText = "✅ รอดชีวิตปกติ";
+        qStatus.className = "font-bold text-emerald-600";
+      } else {
+        qStatus.innerText = "ยังไม่ระบุ";
+        qStatus.className = "font-bold text-slate-500";
+      }
+    }
+
+    async function startCamera() {
+      document.getElementById("start-btn").classList.add("hidden");
+      document.getElementById("loading-text").classList.remove("hidden");
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }
+        });
+        video.srcObject = stream;
+
+        await new Promise(resolve => video.onloadedmetadata = resolve);
+
+        document.getElementById("loading-text").classList.add("hidden");
+        video.classList.remove("hidden");
+
+        // ยิงสแกน Realtime ทุกๆ 1.5 วินาที
+        setInterval(captureAndInfer, 1500);
+
+      } catch (err) {
+        alert("ไม่สามารถเปิดกล้องได้ โปรดตรวจสอบการอนุญาตใช้งานกล้อง");
+        document.getElementById("start-btn").classList.remove("hidden");
+        document.getElementById("loading-text").classList.add("hidden");
+      }
+    }
+
+    async function captureAndInfer() {
+      if (isProcessing) return;
+      isProcessing = true;
+
+      document.getElementById("status-text").innerText = "กำลังสแกนวิเคราะห์ภาพ...";
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const base64Image = canvas.toDataURL("image/jpeg", 0.8).split(',')[1];
+
+      try {
+        const response = await fetch(INFER_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: base64Image
+        });
+
+        if (!response.ok) throw new Error("API Error: " + response.status);
+
+        const result = await response.json();
+        parsePredictions(result);
+
+      } catch (error) {
+        console.error(error);
+        document.getElementById("status-text").innerText = "เชื่อมต่อ API ไม่สำเร็จ (เช็คอินเทอร์เน็ต/คีย์)";
+      } finally {
+        isProcessing = false;
+      }
+    }
+
+    function parsePredictions(result) {
+      let eggCount = 0;
+      let antCount = 0;
+      let qAliveCount = 0;
+      let qDeadCount = 0;
+
+      if (result && Array.isArray(result.predictions)) {
+        result.predictions.forEach(item => {
+          const label = item.class.toLowerCase();
+          
+          if (label.includes("egg") || label.includes("ไข่")) eggCount++;
+          else if (label.includes("dead") || label.includes("ตาย")) qDeadCount++;
+          else if (label.includes("queen") || label.includes("ราชินี")) qAliveCount++;
+          else if (label.includes("ant") || label.includes("มด")) antCount++;
+        });
+      }
+
+      // อัปเดตตัวเลข Realtime บนหน้าจอ
+      document.getElementById("egg-count").innerText = eggCount;
+      document.getElementById("ant-count").innerText = antCount;
+      document.getElementById("queen-alive-count").innerText = qAliveCount;
+      document.getElementById("queen-dead-count").innerText = qDeadCount;
+
+      document.getElementById("status-text").innerText = "สแกนสำเร็จเรียบร้อย!";
+    }
+
+    // บันทึกข้อมูลของรังปัจจุบัน
+    function saveScanRecord() {
+      const now = new Date().toLocaleString("th-TH");
+      const data = nests[currentNest];
+
+      if (!data.firstDate) {
+        data.firstDate = now; // ถ้าสแกนครั้งแรก ให้จำวันที่เริ่มต้นไว้
+      }
+      data.lastDate = now; // บันทึกวันที่สแกนล่าสุด
+
+      // ดึงค่าผลสแกนปัจจุบัน
+      data.egg = parseInt(document.getElementById("egg-count").innerText);
+      data.ant = parseInt(document.getElementById("ant-count").innerText);
+      data.qAlive = parseInt(document.getElementById("queen-alive-count").innerText);
+      data.qDead = parseInt(document.getElementById("queen-dead-count").innerText);
+
+      saveToLocalStorage();
+      loadNestData();
+      alert(`บันทึกข้อมูลของ "${currentNest}" สำเร็จ!`);
+    }
+
+    function saveToLocalStorage() {
+      localStorage.setItem("ant_nests", JSON.stringify(nests));
+    }
+  </script>
+</body>
+</html>

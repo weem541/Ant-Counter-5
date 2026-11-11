@@ -288,7 +288,7 @@
       } catch (error) {
         console.error(error);
         document.getElementById("status-text").innerText = "❌ เชื่อมต่อ API ไม่สำเร็จ (เช็คอินเทอร์เน็ต/คีย์)";
-      } font-medium {
+      } finally {
         isProcessing = false;
         captureBtn.disabled = false;
         captureBtn.classList.remove("opacity-50");

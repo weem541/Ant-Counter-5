@@ -16,7 +16,7 @@
         <span>🐜</span>
         <span>Ant Care Manager</span>
       </div>
-      <span class="text-xs bg-blue-100 text-blue-700 font-semibold px-2.5 py-1 rounded-full">v1.1 Manual Capture</span>
+      <span class="text-xs bg-blue-100 text-blue-700 font-semibold px-2.5 py-1 rounded-full">v1.2 Scan Result View</span>
     </div>
 
     <!-- 1. ส่วนเลือก/สร้างรัง (Nest Selector) -->
@@ -26,29 +26,24 @@
         <button onclick="createNewNest()" class="text-blue-600 hover:underline text-[11px]">+ สร้างรังใหม่</button>
       </label>
       <select id="nest-select" onchange="loadNestData()" class="w-full p-2 text-sm bg-white border border-slate-300 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <!-- ถูกเติมด้วย JavaScript -->
       </select>
     </div>
 
     <!-- 2. ส่วนแสดงกล้อง & ผลการถ่ายภาพ -->
     <div id="webcam-container" class="w-full h-64 bg-slate-900 rounded-2xl overflow-hidden flex flex-col items-center justify-center relative border border-slate-200 shadow-inner">
       
-      <!-- Live Badge / Camera Mode Badge -->
       <div id="camera-badge" class="absolute top-3 left-3 bg-black/40 backdrop-blur-md text-white text-[10px] px-2.5 py-0.5 rounded-full z-20 font-semibold flex items-center gap-1">
         <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> READY
       </div>
 
-      <!-- ปุ่มสลับกล้อง (แสดงเมื่อเปิดกล้องแล้ว) -->
       <button id="switch-cam-btn" onclick="switchCamera()" class="hidden absolute top-3 right-3 bg-black/50 hover:bg-black/70 text-white text-xs px-2.5 py-1 rounded-full z-20 transition flex items-center gap-1">
         🔄 สลับกล้อง
       </button>
 
-      <!-- Video Feed & Display Canvas -->
       <video id="webcam" class="w-full h-full object-cover hidden" autoplay playsinline muted></video>
       <canvas id="display-canvas" class="w-full h-full object-cover hidden"></canvas>
       <canvas id="capture-canvas" class="hidden"></canvas>
 
-      <!-- Start Button -->
       <button id="start-btn" onclick="startCamera()" class="z-30 bg-white hover:bg-slate-50 text-slate-800 font-bold py-3 px-6 rounded-2xl shadow-lg transition transform active:scale-95 flex flex-col items-center gap-1">
         <span class="text-3xl">📷</span>
         <span class="text-xs">เปิดใช้งานกล้อง</span>
@@ -70,8 +65,8 @@
     <!-- Status Text -->
     <p id="status-text" class="text-center text-xs text-slate-500 font-medium">กดปุ่ม "เปิดใช้งานกล้อง" เพื่อเริ่มถ่ายภาพ</p>
 
-    <!-- 3. ส่วนแสดงผลการสแกนล่าสุด -->
-    <div class="grid grid-cols-2 gap-2">
+    <!-- 3. ส่วนแสดงผลการสแกนล่าสุด (ซ่อนไว้ก่อนจนกว่าจะสแกนเสร็จ) -->
+    <div id="result-container" class="hidden grid grid-cols-2 gap-2 transition-all">
       <div class="bg-blue-50/80 p-3 rounded-2xl border border-blue-100 text-center">
         <p class="text-[11px] text-blue-600 font-bold mb-0.5">🥚 จำนวนไข่</p>
         <p class="text-2xl font-black text-blue-800"><span id="egg-count">0</span> <span class="text-xs font-normal">ฟอง</span></p>
@@ -88,12 +83,12 @@
         <p class="text-[11px] text-rose-600 font-bold mb-0.5">💀 ราชินี (ตาย)</p>
         <p class="text-2xl font-black text-rose-800"><span id="queen-dead-count">0</span> <span class="text-xs font-normal">ตัว</span></p>
       </div>
+      
+      <!-- ปุ่มบันทึกแสดงเฉพาะหลังสแกนสำเร็จ -->
+      <button onclick="saveScanRecord()" class="col-span-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-2xl shadow-md transition active:scale-95 flex justify-center items-center gap-2 text-sm mt-1">
+        <span>💾</span> บันทึกผลลงประวัติตามรังนี้
+      </button>
     </div>
-
-    <!-- ปุ่มบันทึกข้อมูลเข้าประวัติตามรัง -->
-    <button onclick="saveScanRecord()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-2xl shadow-md transition active:scale-95 flex justify-center items-center gap-2 text-sm">
-      <span>💾</span> บันทึกผลลงประวัติตามรังนี้
-    </button>
 
     <!-- 4. ส่วนแสดงประวัติและคำนวณระยะเวลา (Growth Timeline & History) -->
     <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col gap-2">
@@ -121,7 +116,6 @@
   </div>
 
   <script>
-    // 🔑 ตั้งค่า Roboflow API
     const API_KEY = "UBjBHDRdFFV8bd2XMIsW";
     const MODEL_ID = "find-egg-ant-and-ant";
     const VERSION = "1";
@@ -134,10 +128,9 @@
     const displayCtx = displayCanvas.getContext("2d");
     
     let currentStream = null;
-    let currentFacingMode = "environment"; // เริ่มที่กล้องหลัง
+    let currentFacingMode = "environment";
     let isProcessing = false;
 
-    // ระบบฐานข้อมูลในเครื่อง (LocalStorage)
     let nests = JSON.parse(localStorage.getItem("ant_nests")) || {
       "Nest_01": { firstDate: null, lastDate: null, egg: 0, ant: 0, qAlive: 0, qDead: 0 }
     };
@@ -238,17 +231,18 @@
       if (isProcessing) return;
       isProcessing = true;
 
+      // ซ่อนกล่องผลลัพธ์ไว้ก่อนขณะกำลังประมวลผล
+      document.getElementById("result-container").classList.add("hidden");
+
       const captureBtn = document.getElementById("capture-btn");
       captureBtn.disabled = true;
       captureBtn.classList.add("opacity-50");
       document.getElementById("status-text").innerText = "⏳ กำลังถ่ายภาพและส่งประมวลผล...";
 
-      // วาดภาพจาก วิดีโอ ลงใน captureCanvas
       captureCanvas.width = video.videoWidth;
       captureCanvas.height = video.videoHeight;
       captureCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
 
-      // สลับไปแสดง Canvas สำหรับดูผลลัพธ์ นำวิดีโอซ่อนไป
       displayCanvas.width = video.videoWidth;
       displayCanvas.height = video.videoHeight;
       displayCtx.drawImage(captureCanvas, 0, 0);
@@ -270,6 +264,8 @@
         const result = await response.json();
         parseAndDrawPredictions(result);
         
+        // แสดงกล่องผลลัพธ์หลังจากคำนวณเสร็จสิ้น
+        document.getElementById("result-container").classList.remove("hidden");
         document.getElementById("retake-btn").classList.remove("hidden");
         document.getElementById("status-text").innerText = "✅ คำนวณผลเสร็จสิ้น!";
 
@@ -289,29 +285,27 @@
       let qAliveCount = 0;
       let qDeadCount = 0;
 
-      // รีเซ็ตวาดรูปภาพตั้งต้นบน Display Canvas
       displayCtx.drawImage(captureCanvas, 0, 0);
 
       if (result && Array.isArray(result.predictions)) {
         result.predictions.forEach(item => {
           const label = item.class.toLowerCase();
           
-          let boxColor = "#3b82f6"; // default blue
+          let boxColor = "#3b82f6";
           if (label.includes("egg") || label.includes("ไข่")) {
             eggCount++;
-            boxColor = "#3b82f6"; // blue
+            boxColor = "#3b82f6";
           } else if (label.includes("dead") || label.includes("ตาย")) {
             qDeadCount++;
-            boxColor = "#f43f5e"; // red
+            boxColor = "#f43f5e";
           } else if (label.includes("queen") || label.includes("ราชินี")) {
             qAliveCount++;
-            boxColor = "#10b981"; // green
+            boxColor = "#10b981";
           } else if (label.includes("ant") || label.includes("มด")) {
             antCount++;
-            boxColor = "#f97316"; // orange
+            boxColor = "#f97316";
           }
 
-          // วาด Bounding Box ลงบนรูปภาพ
           const x = item.x - item.width / 2;
           const y = item.y - item.height / 2;
 
@@ -319,7 +313,6 @@
           displayCtx.lineWidth = 4;
           displayCtx.strokeRect(x, y, item.width, item.height);
 
-          // วาดป้ายชื่อคลาส
           displayCtx.fillStyle = boxColor;
           displayCtx.font = "bold 16px sans-serif";
           const text = `${item.class} (${(item.confidence * 100).toFixed(0)}%)`;
@@ -331,7 +324,6 @@
         });
       }
 
-      // อัปเดตตัวเลขผลลัพธ์ขึ้นหน้าจอ
       document.getElementById("egg-count").innerText = eggCount;
       document.getElementById("ant-count").innerText = antCount;
       document.getElementById("queen-alive-count").innerText = qAliveCount;
@@ -341,6 +333,7 @@
     function resetToLiveCamera() {
       displayCanvas.classList.add("hidden");
       video.classList.remove("hidden");
+      document.getElementById("result-container").classList.add("hidden");
       document.getElementById("retake-btn").classList.add("hidden");
       document.getElementById("status-text").innerText = "จัดตำแหน่งภาพให้ชัดเจน แล้วกด 'ถ่ายภาพและวิเคราะห์ผล'";
     }

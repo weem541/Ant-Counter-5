@@ -16,7 +16,7 @@
         <span>🐜</span>
         <span>Ant Care Manager</span>
       </div>
-      <span class="text-xs bg-blue-100 text-blue-700 font-semibold px-2.5 py-1 rounded-full">v1.0 Hybrid</span>
+      <span class="text-xs bg-blue-100 text-blue-700 font-semibold px-2.5 py-1 rounded-full">v1.1 Manual Capture</span>
     </div>
 
     <!-- 1. ส่วนเลือก/สร้างรัง (Nest Selector) -->
@@ -26,34 +26,51 @@
         <button onclick="createNewNest()" class="text-blue-600 hover:underline text-[11px]">+ สร้างรังใหม่</button>
       </label>
       <select id="nest-select" onchange="loadNestData()" class="w-full p-2 text-sm bg-white border border-slate-300 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <!-- จะถูกเติมด้วย JavaScript -->
+        <!-- ถูกเติมด้วย JavaScript -->
       </select>
     </div>
 
-    <!-- 2. ส่วนแสดงกล้อง สแกน AI -->
+    <!-- 2. ส่วนแสดงกล้อง & ผลการถ่ายภาพ -->
     <div id="webcam-container" class="w-full h-64 bg-slate-900 rounded-2xl overflow-hidden flex flex-col items-center justify-center relative border border-slate-200 shadow-inner">
       
-      <!-- Live Badge -->
-      <div class="absolute top-3 left-3 bg-black/40 backdrop-blur-md text-white text-[10px] px-2.5 py-0.5 rounded-full z-20 font-semibold flex items-center gap-1">
-        <span class="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span> CAMERA ACTIVE
+      <!-- Live Badge / Camera Mode Badge -->
+      <div id="camera-badge" class="absolute top-3 left-3 bg-black/40 backdrop-blur-md text-white text-[10px] px-2.5 py-0.5 rounded-full z-20 font-semibold flex items-center gap-1">
+        <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> READY
       </div>
 
-      <video id="webcam" class="w-full h-full object-cover hidden z-10" autoplay playsinline muted></video>
+      <!-- ปุ่มสลับกล้อง (แสดงเมื่อเปิดกล้องแล้ว) -->
+      <button id="switch-cam-btn" onclick="switchCamera()" class="hidden absolute top-3 right-3 bg-black/50 hover:bg-black/70 text-white text-xs px-2.5 py-1 rounded-full z-20 transition flex items-center gap-1">
+        🔄 สลับกล้อง
+      </button>
+
+      <!-- Video Feed & Display Canvas -->
+      <video id="webcam" class="w-full h-full object-cover hidden" autoplay playsinline muted></video>
+      <canvas id="display-canvas" class="w-full h-full object-cover hidden"></canvas>
       <canvas id="capture-canvas" class="hidden"></canvas>
 
       <!-- Start Button -->
       <button id="start-btn" onclick="startCamera()" class="z-30 bg-white hover:bg-slate-50 text-slate-800 font-bold py-3 px-6 rounded-2xl shadow-lg transition transform active:scale-95 flex flex-col items-center gap-1">
         <span class="text-3xl">📷</span>
-        <span class="text-xs">เปิดกล้องสแกนประมวลผล</span>
+        <span class="text-xs">เปิดใช้งานกล้อง</span>
       </button>
 
       <p id="loading-text" class="text-slate-400 text-xs hidden z-30">กำลังเชื่อมต่อกล้อง...</p>
     </div>
 
-    <!-- Status Text -->
-    <p id="status-text" class="text-center text-xs text-slate-500 font-medium">พร้อมสแกนข้อมูล</p>
+    <!-- Control Action Buttons -->
+    <div id="camera-controls" class="hidden flex gap-2">
+      <button id="capture-btn" onclick="captureAndInfer()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold py-3 rounded-2xl shadow-md transition flex justify-center items-center gap-2 text-sm">
+        <span>📸</span> ถ่ายภาพและวิเคราะห์ผล
+      </button>
+      <button id="retake-btn" onclick="resetToLiveCamera()" class="hidden bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 px-4 rounded-2xl transition text-sm">
+        🔄 ถ่ายใหม่
+      </button>
+    </div>
 
-    <!-- 3. ส่วนแสดงผลการสแกน (Current Realtime AI Detection) -->
+    <!-- Status Text -->
+    <p id="status-text" class="text-center text-xs text-slate-500 font-medium">กดปุ่ม "เปิดใช้งานกล้อง" เพื่อเริ่มถ่ายภาพ</p>
+
+    <!-- 3. ส่วนแสดงผลการสแกนล่าสุด -->
     <div class="grid grid-cols-2 gap-2">
       <div class="bg-blue-50/80 p-3 rounded-2xl border border-blue-100 text-center">
         <p class="text-[11px] text-blue-600 font-bold mb-0.5">🥚 จำนวนไข่</p>
@@ -108,11 +125,16 @@
     const API_KEY = "UBjBHDRdFFV8bd2XMIsW";
     const MODEL_ID = "find-egg-ant-and-ant";
     const VERSION = "1";
-    const INFER_URL = "https://detect.roboflow.com/" + MODEL_ID + "/" + VERSION + "?api_key=" + API_KEY;
+    const INFER_URL = `https://detect.roboflow.com/${MODEL_ID}/${VERSION}?api_key=${API_KEY}`;
 
     const video = document.getElementById("webcam");
-    const canvas = document.getElementById("capture-canvas");
-    const ctx = canvas.getContext("2d");
+    const captureCanvas = document.getElementById("capture-canvas");
+    const displayCanvas = document.getElementById("display-canvas");
+    const captureCtx = captureCanvas.getContext("2d");
+    const displayCtx = displayCanvas.getContext("2d");
+    
+    let currentStream = null;
+    let currentFacingMode = "environment"; // เริ่มที่กล้องหลัง
     let isProcessing = false;
 
     // ระบบฐานข้อมูลในเครื่อง (LocalStorage)
@@ -121,7 +143,6 @@
     };
     let currentNest = "Nest_01";
 
-    // เริ่มต้นระบบ
     window.onload = () => {
       renderNestOptions();
       loadNestData();
@@ -157,7 +178,6 @@
       document.getElementById("first-scan-date").innerText = data.firstDate || "ยังไม่มีข้อมูล";
       document.getElementById("last-scan-date").innerText = data.lastDate || "ยังไม่มีข้อมูล";
 
-      // คำนวณส่วนต่างจำนวนวัน
       if (data.firstDate) {
         const start = new Date(data.firstDate);
         const end = data.lastDate ? new Date(data.lastDate) : new Date();
@@ -167,7 +187,6 @@
         document.getElementById("days-badge").innerText = "ผ่านไป 0 วัน";
       }
 
-      // แสดงสถานะราชินี
       const qStatus = document.getElementById("queen-status-text");
       if (data.qDead > 0) {
         qStatus.innerText = "❌ ไม่รอด (พบราชินีตาย)";
@@ -185,19 +204,23 @@
       document.getElementById("start-btn").classList.add("hidden");
       document.getElementById("loading-text").classList.remove("hidden");
 
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" }
+        currentStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: currentFacingMode }
         });
-        video.srcObject = stream;
+        video.srcObject = currentStream;
 
         await new Promise(resolve => video.onloadedmetadata = resolve);
 
         document.getElementById("loading-text").classList.add("hidden");
         video.classList.remove("hidden");
-
-        // ยิงสแกน Realtime ทุกๆ 1.5 วินาที
-        setInterval(captureAndInfer, 1500);
+        document.getElementById("camera-controls").classList.remove("hidden");
+        document.getElementById("switch-cam-btn").classList.remove("hidden");
+        document.getElementById("status-text").innerText = "จัดตำแหน่งภาพให้ชัดเจน แล้วกด 'ถ่ายภาพและวิเคราะห์ผล'";
 
       } catch (err) {
         alert("ไม่สามารถเปิดกล้องได้ โปรดตรวจสอบการอนุญาตใช้งานกล้อง");
@@ -206,17 +229,34 @@
       }
     }
 
+    function switchCamera() {
+      currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+      startCamera();
+    }
+
     async function captureAndInfer() {
       if (isProcessing) return;
       isProcessing = true;
 
-      document.getElementById("status-text").innerText = "กำลังสแกนวิเคราะห์ภาพ...";
+      const captureBtn = document.getElementById("capture-btn");
+      captureBtn.disabled = true;
+      captureBtn.classList.add("opacity-50");
+      document.getElementById("status-text").innerText = "⏳ กำลังถ่ายภาพและส่งประมวลผล...";
 
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      // วาดภาพจาก วิดีโอ ลงใน captureCanvas
+      captureCanvas.width = video.videoWidth;
+      captureCanvas.height = video.videoHeight;
+      captureCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
 
-      const base64Image = canvas.toDataURL("image/jpeg", 0.8).split(',')[1];
+      // สลับไปแสดง Canvas สำหรับดูผลลัพธ์ นำวิดีโอซ่อนไป
+      displayCanvas.width = video.videoWidth;
+      displayCanvas.height = video.videoHeight;
+      displayCtx.drawImage(captureCanvas, 0, 0);
+      
+      video.classList.add("hidden");
+      displayCanvas.classList.remove("hidden");
+
+      const base64Image = captureCanvas.toDataURL("image/jpeg", 0.85).split(',')[1];
 
       try {
         const response = await fetch(INFER_URL, {
@@ -228,53 +268,92 @@
         if (!response.ok) throw new Error("API Error: " + response.status);
 
         const result = await response.json();
-        parsePredictions(result);
+        parseAndDrawPredictions(result);
+        
+        document.getElementById("retake-btn").classList.remove("hidden");
+        document.getElementById("status-text").innerText = "✅ คำนวณผลเสร็จสิ้น!";
 
       } catch (error) {
         console.error(error);
-        document.getElementById("status-text").innerText = "เชื่อมต่อ API ไม่สำเร็จ (เช็คอินเทอร์เน็ต/คีย์)";
+        document.getElementById("status-text").innerText = "❌ เชื่อมต่อ API ไม่สำเร็จ (เช็คอินเทอร์เน็ต/คีย์)";
       } finally {
         isProcessing = false;
+        captureBtn.disabled = false;
+        captureBtn.classList.remove("opacity-50");
       }
     }
 
-    function parsePredictions(result) {
+    function parseAndDrawPredictions(result) {
       let eggCount = 0;
       let antCount = 0;
       let qAliveCount = 0;
       let qDeadCount = 0;
 
+      // รีเซ็ตวาดรูปภาพตั้งต้นบน Display Canvas
+      displayCtx.drawImage(captureCanvas, 0, 0);
+
       if (result && Array.isArray(result.predictions)) {
         result.predictions.forEach(item => {
           const label = item.class.toLowerCase();
           
-          if (label.includes("egg") || label.includes("ไข่")) eggCount++;
-          else if (label.includes("dead") || label.includes("ตาย")) qDeadCount++;
-          else if (label.includes("queen") || label.includes("ราชินี")) qAliveCount++;
-          else if (label.includes("ant") || label.includes("มด")) antCount++;
+          let boxColor = "#3b82f6"; // default blue
+          if (label.includes("egg") || label.includes("ไข่")) {
+            eggCount++;
+            boxColor = "#3b82f6"; // blue
+          } else if (label.includes("dead") || label.includes("ตาย")) {
+            qDeadCount++;
+            boxColor = "#f43f5e"; // red
+          } else if (label.includes("queen") || label.includes("ราชินี")) {
+            qAliveCount++;
+            boxColor = "#10b981"; // green
+          } else if (label.includes("ant") || label.includes("มด")) {
+            antCount++;
+            boxColor = "#f97316"; // orange
+          }
+
+          // วาด Bounding Box ลงบนรูปภาพ
+          const x = item.x - item.width / 2;
+          const y = item.y - item.height / 2;
+
+          displayCtx.strokeStyle = boxColor;
+          displayCtx.lineWidth = 4;
+          displayCtx.strokeRect(x, y, item.width, item.height);
+
+          // วาดป้ายชื่อคลาส
+          displayCtx.fillStyle = boxColor;
+          displayCtx.font = "bold 16px sans-serif";
+          const text = `${item.class} (${(item.confidence * 100).toFixed(0)}%)`;
+          const textWidth = displayCtx.measureText(text).width;
+          displayCtx.fillRect(x, y > 25 ? y - 25 : y, textWidth + 10, 25);
+
+          displayCtx.fillStyle = "#ffffff";
+          displayCtx.fillText(text, x + 5, y > 25 ? y - 7 : y + 18);
         });
       }
 
-      // อัปเดตตัวเลข Realtime บนหน้าจอ
+      // อัปเดตตัวเลขผลลัพธ์ขึ้นหน้าจอ
       document.getElementById("egg-count").innerText = eggCount;
       document.getElementById("ant-count").innerText = antCount;
       document.getElementById("queen-alive-count").innerText = qAliveCount;
       document.getElementById("queen-dead-count").innerText = qDeadCount;
-
-      document.getElementById("status-text").innerText = "สแกนสำเร็จเรียบร้อย!";
     }
 
-    // บันทึกข้อมูลของรังปัจจุบัน
+    function resetToLiveCamera() {
+      displayCanvas.classList.add("hidden");
+      video.classList.remove("hidden");
+      document.getElementById("retake-btn").classList.add("hidden");
+      document.getElementById("status-text").innerText = "จัดตำแหน่งภาพให้ชัดเจน แล้วกด 'ถ่ายภาพและวิเคราะห์ผล'";
+    }
+
     function saveScanRecord() {
       const now = new Date().toLocaleString("th-TH");
       const data = nests[currentNest];
 
       if (!data.firstDate) {
-        data.firstDate = now; // ถ้าสแกนครั้งแรก ให้จำวันที่เริ่มต้นไว้
+        data.firstDate = now;
       }
-      data.lastDate = now; // บันทึกวันที่สแกนล่าสุด
+      data.lastDate = now;
 
-      // ดึงค่าผลสแกนปัจจุบัน
       data.egg = parseInt(document.getElementById("egg-count").innerText);
       data.ant = parseInt(document.getElementById("ant-count").innerText);
       data.qAlive = parseInt(document.getElementById("queen-alive-count").innerText);
@@ -282,7 +361,7 @@
 
       saveToLocalStorage();
       loadNestData();
-      alert(`บันทึกข้อมูลของ "${currentNest}" สำเร็จ!`);
+      alert(`บันทึกข้อมูลของ "${currentNest}" เรียบร้อยแล้ว!`);
     }
 
     function saveToLocalStorage() {

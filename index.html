@@ -72,21 +72,33 @@
 
     <!-- 3. ส่วนแสดงผลการสแกนล่าสุด -->
     <div class="grid grid-cols-2 gap-2">
-      <div class="bg-blue-50/80 p-3 rounded-2xl border border-blue-100 text-center">
-        <p class="text-[11px] text-blue-600 font-bold mb-0.5">🥚 จำนวนไข่</p>
-        <p class="text-2xl font-black text-blue-800"><span id="egg-count">0</span> <span class="text-xs font-normal">ฟอง</span></p>
+      <div class="bg-blue-50/80 p-3 rounded-2xl border border-blue-100 text-center flex flex-col justify-center items-center min-h-[85px]">
+        <p class="text-[11px] text-blue-600 font-bold mb-1">🥚 จำนวนไข่</p>
+        <p class="text-2xl font-black text-blue-800 flex items-baseline justify-center gap-1">
+          <span id="egg-count"></span> 
+          <span class="text-xl font-bold">ฟอง</span>
+        </p>
       </div>
-      <div class="bg-orange-50/80 p-3 rounded-2xl border border-orange-100 text-center">
-        <p class="text-[11px] text-orange-600 font-bold mb-0.5">🐜 มดงาน</p>
-        <p class="text-2xl font-black text-orange-800"><span id="ant-count">0</span> <span class="text-xs font-normal">ตัว</span></p>
+      <div class="bg-orange-50/80 p-3 rounded-2xl border border-orange-100 text-center flex flex-col justify-center items-center min-h-[85px]">
+        <p class="text-[11px] text-orange-600 font-bold mb-1">🐜 มดงาน</p>
+        <p class="text-2xl font-black text-orange-800 flex items-baseline justify-center gap-1">
+          <span id="ant-count"></span> 
+          <span class="text-xl font-bold">ตัว</span>
+        </p>
       </div>
-      <div class="bg-emerald-50/80 p-3 rounded-2xl border border-emerald-100 text-center">
-        <p class="text-[11px] text-emerald-600 font-bold mb-0.5">👑 ราชินี (รอด)</p>
-        <p class="text-2xl font-black text-emerald-800"><span id="queen-alive-count">0</span> <span class="text-xs font-normal">ตัว</span></p>
+      <div class="bg-emerald-50/80 p-3 rounded-2xl border border-emerald-100 text-center flex flex-col justify-center items-center min-h-[85px]">
+        <p class="text-[11px] text-emerald-600 font-bold mb-1">👑 ราชินี (รอด)</p>
+        <p class="text-2xl font-black text-emerald-800 flex items-baseline justify-center gap-1">
+          <span id="queen-alive-count"></span> 
+          <span class="text-xl font-bold">ตัว</span>
+        </p>
       </div>
-      <div class="bg-rose-50/80 p-3 rounded-2xl border border-rose-100 text-center">
-        <p class="text-[11px] text-rose-600 font-bold mb-0.5">💀 ราชินี (ตาย)</p>
-        <p class="text-2xl font-black text-rose-800"><span id="queen-dead-count">0</span> <span class="text-xs font-normal">ตัว</span></p>
+      <div class="bg-rose-50/80 p-3 rounded-2xl border border-rose-100 text-center flex flex-col justify-center items-center min-h-[85px]">
+        <p class="text-[11px] text-rose-600 font-bold mb-1">💀 ราชินี (ตาย)</p>
+        <p class="text-2xl font-black text-rose-800 flex items-baseline justify-center gap-1">
+          <span id="queen-dead-count"></span> 
+          <span class="text-xl font-bold">ตัว</span>
+        </p>
       </div>
     </div>
 
@@ -276,7 +288,7 @@
       } catch (error) {
         console.error(error);
         document.getElementById("status-text").innerText = "❌ เชื่อมต่อ API ไม่สำเร็จ (เช็คอินเทอร์เน็ต/คีย์)";
-      } finally {
+      } font-medium {
         isProcessing = false;
         captureBtn.disabled = false;
         captureBtn.classList.remove("opacity-50");
@@ -354,10 +366,10 @@
       }
       data.lastDate = now;
 
-      data.egg = parseInt(document.getElementById("egg-count").innerText);
-      data.ant = parseInt(document.getElementById("ant-count").innerText);
-      data.qAlive = parseInt(document.getElementById("queen-alive-count").innerText);
-      data.qDead = parseInt(document.getElementById("queen-dead-count").innerText);
+      data.egg = parseInt(document.getElementById("egg-count").innerText || 0);
+      data.ant = parseInt(document.getElementById("ant-count").innerText || 0);
+      data.qAlive = parseInt(document.getElementById("queen-alive-count").innerText || 0);
+      data.qDead = parseInt(document.getElementById("queen-dead-count").innerText || 0);
 
       saveToLocalStorage();
       loadNestData();

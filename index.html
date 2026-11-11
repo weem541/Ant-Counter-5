@@ -16,7 +16,7 @@
         <span>🐜</span>
         <span>Ant Care Manager</span>
       </div>
-      <span class="text-xs bg-blue-100 text-blue-700 font-semibold px-2.5 py-1 rounded-full">v1.2 Scan Result View</span>
+      <span class="text-xs bg-blue-100 text-blue-700 font-semibold px-2.5 py-1 rounded-full">v1.3 Visual Grid</span>
     </div>
 
     <!-- 1. ส่วนเลือก/สร้างรัง (Nest Selector) -->
@@ -65,27 +65,27 @@
     <!-- Status Text -->
     <p id="status-text" class="text-center text-xs text-slate-500 font-medium">กดปุ่ม "เปิดใช้งานกล้อง" เพื่อเริ่มถ่ายภาพ</p>
 
-    <!-- 3. ส่วนแสดงผลการสแกนล่าสุด (ซ่อนไว้ก่อนจนกว่าจะสแกนเสร็จ) -->
-    <div id="result-container" class="hidden grid grid-cols-2 gap-2 transition-all">
+    <!-- 3. ส่วนแสดงผลการสแกน (คงกรอบเดิมไว้ แต่ใส่ - แทนเลข 0) -->
+    <div id="result-container" class="grid grid-cols-2 gap-2 transition-all">
       <div class="bg-blue-50/80 p-3 rounded-2xl border border-blue-100 text-center">
         <p class="text-[11px] text-blue-600 font-bold mb-0.5">🥚 จำนวนไข่</p>
-        <p class="text-2xl font-black text-blue-800"><span id="egg-count">0</span> <span class="text-xs font-normal">ฟอง</span></p>
+        <p class="text-2xl font-black text-blue-800"><span id="egg-count">-</span> <span id="egg-unit" class="text-xs font-normal opacity-0">ฟอง</span></p>
       </div>
       <div class="bg-orange-50/80 p-3 rounded-2xl border border-orange-100 text-center">
         <p class="text-[11px] text-orange-600 font-bold mb-0.5">🐜 มดงาน</p>
-        <p class="text-2xl font-black text-orange-800"><span id="ant-count">0</span> <span class="text-xs font-normal">ตัว</span></p>
+        <p class="text-2xl font-black text-orange-800"><span id="ant-count">-</span> <span id="ant-unit" class="text-xs font-normal opacity-0">ตัว</span></p>
       </div>
       <div class="bg-emerald-50/80 p-3 rounded-2xl border border-emerald-100 text-center">
         <p class="text-[11px] text-emerald-600 font-bold mb-0.5">👑 ราชินี (รอด)</p>
-        <p class="text-2xl font-black text-emerald-800"><span id="queen-alive-count">0</span> <span class="text-xs font-normal">ตัว</span></p>
+        <p class="text-2xl font-black text-emerald-800"><span id="queen-alive-count">-</span> <span id="qalive-unit" class="text-xs font-normal opacity-0">ตัว</span></p>
       </div>
       <div class="bg-rose-50/80 p-3 rounded-2xl border border-rose-100 text-center">
         <p class="text-[11px] text-rose-600 font-bold mb-0.5">💀 ราชินี (ตาย)</p>
-        <p class="text-2xl font-black text-rose-800"><span id="queen-dead-count">0</span> <span class="text-xs font-normal">ตัว</span></p>
+        <p class="text-2xl font-black text-rose-800"><span id="queen-dead-count">-</span> <span id="qdead-unit" class="text-xs font-normal opacity-0">ตัว</span></p>
       </div>
       
-      <!-- ปุ่มบันทึกแสดงเฉพาะหลังสแกนสำเร็จ -->
-      <button onclick="saveScanRecord()" class="col-span-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-2xl shadow-md transition active:scale-95 flex justify-center items-center gap-2 text-sm mt-1">
+      <!-- ปุ่มบันทึก -->
+      <button id="save-btn" onclick="saveScanRecord()" disabled class="col-span-2 w-full bg-slate-300 text-slate-500 cursor-not-allowed font-bold py-3 rounded-2xl shadow-md transition flex justify-center items-center gap-2 text-sm mt-1">
         <span>💾</span> บันทึกผลลงประวัติตามรังนี้
       </button>
     </div>
@@ -231,9 +231,6 @@
       if (isProcessing) return;
       isProcessing = true;
 
-      // ซ่อนกล่องผลลัพธ์ไว้ก่อนขณะกำลังประมวลผล
-      document.getElementById("result-container").classList.add("hidden");
-
       const captureBtn = document.getElementById("capture-btn");
       captureBtn.disabled = true;
       captureBtn.classList.add("opacity-50");
@@ -264,10 +261,13 @@
         const result = await response.json();
         parseAndDrawPredictions(result);
         
-        // แสดงกล่องผลลัพธ์หลังจากคำนวณเสร็จสิ้น
-        document.getElementById("result-container").classList.remove("hidden");
         document.getElementById("retake-btn").classList.remove("hidden");
         document.getElementById("status-text").innerText = "✅ คำนวณผลเสร็จสิ้น!";
+
+        // เปิดใช้งานปุ่มบันทึกผล
+        const saveBtn = document.getElementById("save-btn");
+        saveBtn.disabled = false;
+        saveBtn.className = "col-span-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-2xl shadow-md transition active:scale-95 flex justify-center items-center gap-2 text-sm mt-1";
 
       } catch (error) {
         console.error(error);
@@ -324,21 +324,44 @@
         });
       }
 
+      // แสดงตัวเลขจริงหลังคำนวณเสร็จ และปลดซ่อนหน่วยนับ
       document.getElementById("egg-count").innerText = eggCount;
       document.getElementById("ant-count").innerText = antCount;
       document.getElementById("queen-alive-count").innerText = qAliveCount;
       document.getElementById("queen-dead-count").innerText = qDeadCount;
+
+      document.getElementById("egg-unit").classList.remove("opacity-0");
+      document.getElementById("ant-unit").classList.remove("opacity-0");
+      document.getElementById("qalive-unit").classList.remove("opacity-0");
+      document.getElementById("qdead-unit").classList.remove("opacity-0");
     }
 
     function resetToLiveCamera() {
       displayCanvas.classList.add("hidden");
       video.classList.remove("hidden");
-      document.getElementById("result-container").classList.add("hidden");
       document.getElementById("retake-btn").classList.add("hidden");
       document.getElementById("status-text").innerText = "จัดตำแหน่งภาพให้ชัดเจน แล้วกด 'ถ่ายภาพและวิเคราะห์ผล'";
+
+      // รีเซ็ตค่ากลับเป็น -
+      document.getElementById("egg-count").innerText = "-";
+      document.getElementById("ant-count").innerText = "-";
+      document.getElementById("queen-alive-count").innerText = "-";
+      document.getElementById("queen-dead-count").innerText = "-";
+
+      document.getElementById("egg-unit").classList.add("opacity-0");
+      document.getElementById("ant-unit").classList.add("opacity-0");
+      document.getElementById("qalive-unit").classList.add("opacity-0");
+      document.getElementById("qdead-unit").classList.add("opacity-0");
+
+      const saveBtn = document.getElementById("save-btn");
+      saveBtn.disabled = true;
+      saveBtn.className = "col-span-2 w-full bg-slate-300 text-slate-500 cursor-not-allowed font-bold py-3 rounded-2xl shadow-md transition flex justify-center items-center gap-2 text-sm mt-1";
     }
 
     function saveScanRecord() {
+      const eggText = document.getElementById("egg-count").innerText;
+      if (eggText === "-") return;
+
       const now = new Date().toLocaleString("th-TH");
       const data = nests[currentNest];
 
